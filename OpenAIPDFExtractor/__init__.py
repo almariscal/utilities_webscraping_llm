@@ -101,6 +101,7 @@ class PDFParser:
                 thread_id=thread.id, assistant_id=assistant.id)
             messages = list(self.client.beta.threads.messages.list(thread_id=thread.id, run_id=run.id))
             message_content = messages[0].content[0].text
+            openai.files.delete(file_id=file.id)
 
             # Extrae y valida el JSON
             match = re.search(r'(\{.*\})', message_content.value, re.DOTALL)
