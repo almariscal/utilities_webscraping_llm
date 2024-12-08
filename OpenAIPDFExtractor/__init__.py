@@ -66,7 +66,7 @@ class PDFParser:
                 instructions=(
                     "You are an expert analyzing electricity offers from websites and PDFs, "
                     "as well as extracting the prices and comparing them. "
-                    "Generate a structured output according to the Overview schema."
+                    #"Generate a structured output according to the Overview schema."
                 ),
                 model="gpt-4o-2024-08-06",
                 tools=tools
@@ -87,9 +87,9 @@ class PDFParser:
                     {
                         "role": "user",
                         "content": (
-                            f"Extrae toda la información y explica la siguiente oferta de electricidad. "
-                            f"Genera un json con la siguiente estructura: {schema_json_string}. "
-                            "Incluye únicamente el json y comienza por '{{'."
+                            f"Extrae toda la información y explica la siguiente oferta de electricidad."
+                            f"Genera un output de una manera ordenada para que luego se pueda parsear, así que sigue el esquema que se muestra a continuación: {schema_json_string}. "
+                            #"Incluye únicamente el json y comienza por '{{'."
                         ),
                         "attachments": [{"file_id": file.id, "tools": [{"type": "file_search"}]}],
                     },
@@ -103,13 +103,26 @@ class PDFParser:
             message_content = messages[0].content[0].text
             openai.files.delete(file_id=file.id)
 
+            #Extraemos la info con otra llamada a OpenAI
+            completion = self.client.beta.chat.completions.parse(
+                model="gpt-4o-2024-08-06",
+                messages=[
+                    {"role": "user", "content": f"Extrae la información en formato json a partir de la extracción del analista de precios {message_content.value}"}
+                ],
+                response_format=Overview,
+            )
+
+            return completion.choices[0].message.parsed
+
             # Extrae y valida el JSON
-            match = re.search(r'(\{.*\})', message_content.value, re.DOTALL)
-            if match:
-                json_str = match.group(1)
-                return Overview.parse_raw(json_str)
-            else:
-                raise ValueError("No se encontró un JSON válido en la respuesta.")
+            #json_string = message_content.value
+            #json_string_limpio = re.sub(r'"\$defs":\s*{.*?}', '', json_string, flags=re.DOTALL)
+            #match = re.search(r'(\{.*\})', json_string_limpio, re.DOTALL)
+            #if match:
+            #    json_str = match.group(1)
+            #    return Overview.parse_raw(json_str)
+            #else:
+            #    raise ValueError("No se encontró un JSON válido en la respuesta.")
 
         except ValidationError as ve:
             raise Exception(f"Error de validación al procesar los datos: {ve}")
