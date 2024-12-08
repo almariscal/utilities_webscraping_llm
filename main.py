@@ -23,3 +23,15 @@ pdf_generator = PDFGenerator(websites_file)
 
 # Ejecutar el proceso para generar los PDFs
 asyncio.run(pdf_generator.process_all_websites())
+
+# Probando el modo multimodal de OpenAI
+
+from OpenAIPDFExtractor import PDFParser
+
+try:
+    parser = PDFParser(openai_api_key=openai_api_key)
+    pdf_url = './temp_pdf/octopusenergy_es_7076053329209093311_20241208_180609.pdf'
+    overview = parser.parse_pdf(pdf_url)
+    print(overview)
+except Exception as e:
+    print(f"Error al procesar el PDF: {e}")

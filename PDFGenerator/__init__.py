@@ -41,6 +41,30 @@ class PDFGenerator:
         except Exception as e:
             print(f"No se pudieron aceptar cookies: {e}")
 
+    async def click_ver_mas_info(self, page):
+        """
+        Si la URL es de Iberdrola, busca y hace clic en un botón 'Ver más información' o similar.
+        """
+        try:
+            # Verificar si la URL es de Iberdrola
+            if "iberdrola.es" in page.url:
+                # Buscar el botón o enlace con texto 'Ver más información' o similar
+                selectors = [
+                    "button:has-text('Ver más información')",
+                    "a:has-text('Ver más información')",
+                    "button:has-text('Más información')",
+                    "a:has-text('Más información')"
+                ]
+                for selector in selectors:
+                    element = await page.query_selector(selector)
+                    if element:
+                        await element.click()
+                        print(f"Se hizo clic en 'Ver más información' para {page.url}")
+                        await asyncio.sleep(3)  # Esperar a que la información se cargue
+                        break
+        except Exception as e:
+            print(f"No se pudo hacer clic en 'Ver más información': {e}")
+
     async def generate_pdf(self, url, browser):
         """
         Genera un PDF desde una URL utilizando Playwright.
@@ -67,7 +91,11 @@ class PDFGenerator:
 
             # Aceptar cookies, si es necesario
             await self.accept_cookies(page)
-            await asyncio.sleep(3)  # Espera tras aceptar cookies
+
+            # Si la página es de Iberdrola, intentar hacer clic en el botón 'Ver más información'
+            await self.click_ver_mas_info(page)
+
+            await asyncio.sleep(3)  # Espera tras aceptar cookies y hacer clic en 'Ver más información'
 
             # Verificar contenido visible
             content = await page.content()
@@ -82,13 +110,24 @@ class PDFGenerator:
             filename = f"{domain}_{path_hash}_{self.timestamp}.pdf"
             filepath = os.path.join(self.output_folder, filename)
 
-            # Guardar la página como un PDF de una sola página
+            # Obtener las dimensiones del contenido para ajustar el tamaño del PDF
+            content_box = await page.evaluate('''
+                () => {
+                    const body = document.body;
+                    const html = document.documentElement;
+                    const width = Math.max(body.scrollWidth, body.offsetWidth, html.clientWidth, html.scrollWidth, html.offsetWidth);
+                    const height = Math.max(body.scrollHeight, body.offsetHeight, html.clientHeight, html.scrollHeight, html.offsetHeight);
+                    return { width, height };
+                }
+            ''')
+
+            # Guardar la página como un PDF de una sola página ajustando el tamaño a las dimensiones del contenido
             await page.pdf(
                 path=filepath,
-                format=None,
-                width="1920px",
-                height="10000px",  # Captura todo el contenido en una sola página
+                width=f"{content_box['width']}px",  # Ajuste del ancho al contenido
+                height=f"{content_box['height']}px",  # Ajuste de la altura para que se capture todo el contenido
                 scale=1,
+                margin={"top": "0px", "right": "0px", "bottom": "0px", "left": "0px"},  # Márgenes a cero como cadenas
                 print_background=True
             )
             print(f"PDF generado para {url}: {filepath}")
