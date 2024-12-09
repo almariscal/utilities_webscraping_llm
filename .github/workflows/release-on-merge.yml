@@ -5,20 +5,6 @@ on:
     branches:
       - main
 
-permissions:
-  contents: write
-  issues: write
-  pull-requests: write
-  actions: write
-  deployments: write
-  discussions: write
-  statuses: write
-  checks: write
-  packages: write
-  pages: write
-  security-events: write
-  repository-projects: write
-
 jobs:
   build-and-release:
     runs-on: windows-latest
@@ -76,7 +62,7 @@ jobs:
           draft: false
           prerelease: false
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Token para autenticar la acción
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}  # Token para autenticar la acción
 
       # Paso 7: Subir el ejecutable como un asset de la Release solo si la release fue creada
       - name: Upload to GitHub Release
