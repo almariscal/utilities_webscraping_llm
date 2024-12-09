@@ -43,6 +43,8 @@ jobs:
           release_name: Release v${{ github.run_number }}
           draft: false
           prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # Paso 6: Subir el ejecutable como un asset de la Release
       - name: Upload to GitHub Release
