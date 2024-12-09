@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-
 jobs:
   build-and-release:
     runs-on: windows-latest
@@ -52,24 +51,10 @@ jobs:
         run: |
           if (-Not (Test-Path "dist\main.exe")) { exit 1 }  # Si no existe el archivo, falla el flujo
 
-      # Paso 6: Crear una Release en GitHub solo si el ejecutable existe
-      - name: Create GitHub Release
-        id: create_release  # ID del paso para acceder a su salida
-        uses: actions/create-release@v1  # Versión compatible
+      # Paso 6: Crear la Release y subir el ejecutable usando softprops/action-gh-release
+      - name: Create GitHub Release and Upload Executable
+        uses: softprops/action-gh-release@v1
         with:
-          tag_name: v${{ github.run_number }}  # Etiqueta basada en el número de ejecución
-          release_name: Release v${{ github.run_number }}
-          draft: false
-          prerelease: false
+          files: dist/main.exe  # Ruta del ejecutable generado
         env:
-          GITHUB_TOKEN: ${{ secrets.TOKEN_GITHUB }}  # Token para autenticar la acción
-
-      # Paso 7: Subir el ejecutable como un asset de la Release solo si la release fue creada
-      - name: Upload to GitHub Release
-        if: steps.create_release.outcome == 'success'  # Solo subir si la creación de la release fue exitosa
-        uses: actions/upload-release-asset@v1  # Versión compatible
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: dist\main.exe  # Ruta del ejecutable generado
-          asset_name: main.exe       # Nombre del asset en la Release
-          asset_content_type: application/octet-stream
+          token: ${{ secrets.TOKEN_GITHUB }}  # Usa el token de acceso personal o el token de GitHub
