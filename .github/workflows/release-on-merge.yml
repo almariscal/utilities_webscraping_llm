@@ -62,5 +62,6 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: dist/main.exe  # Ruta del ejecutable generado
+          tag_name: v${{ github.run_number }}  # El tag que hemos creado
         env:
           token: ${{ secrets.TOKEN_GITHUB }}  # Usa el token de acceso personal o el token de GitHub
