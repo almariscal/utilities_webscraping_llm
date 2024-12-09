@@ -68,3 +68,5 @@ output_excel_path = os.path.join(output_folder, f'resultados_procesados_{timesta
 
 df.to_excel(output_excel_path, index=False)
 print(f"DataFrame guardado en: {output_excel_path}")
+
+input("Presiona Enter para cerrar...")  # Esto mantiene la terminal abierta hasta que el usuario presione Enter.
