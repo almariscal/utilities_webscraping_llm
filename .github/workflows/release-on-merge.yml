@@ -42,7 +42,7 @@ jobs:
       # Paso 6: Crear una Release en GitHub solo si el ejecutable existe
       - name: Create GitHub Release
         id: create_release  # ID del paso para acceder a su salida
-        uses: actions/create-release@v2  # Usar la versión más reciente
+        uses: actions/create-release@v1  # Versión compatible
         with:
           tag_name: v${{ github.run_number }}  # Etiqueta basada en el número de ejecución
           release_name: Release v${{ github.run_number }}
@@ -54,7 +54,7 @@ jobs:
       # Paso 7: Subir el ejecutable como un asset de la Release solo si la release fue creada
       - name: Upload to GitHub Release
         if: steps.create_release.outcome == 'success'  # Solo subir si la creación de la release fue exitosa
-        uses: actions/upload-release-asset@v1.1  # Usar la versión más reciente
+        uses: actions/upload-release-asset@v1  # Versión compatible
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: dist\main.exe  # Ruta del ejecutable generado
