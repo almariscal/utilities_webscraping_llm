@@ -26,6 +26,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install pyinstaller
           pip install -r requirements.txt
+        continue-on-error: true
 
       # Paso 4: Generar el ejecutable con PyInstaller
       - name: Build executable
