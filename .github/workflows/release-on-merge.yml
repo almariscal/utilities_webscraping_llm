@@ -43,7 +43,8 @@ jobs:
       # Paso 4: Generar el ejecutable con PyInstaller
       - name: Build executable
         run: |
-          pyinstaller --onefile --hidden-import=python-dotenv main.py
+          $env:PLAYWRIGHT_BROWSERS_PATH="0" playwright install chromium
+          pyinstaller --onefile --hidden-import=python-dotenv --hidden-import=pytest-playwright main.py
         continue-on-error: true  # Si este paso falla, no se procederá a la creación del release
 
       # Paso 5: Verificar si el ejecutable fue creado correctamente
