@@ -17,6 +17,8 @@ class Precio(BaseModel):
     precio_te3: float = Field(description="Precio de la energía en el periodo 3")
     precio_tp1: float = Field(description="Precio del término de potencia en el periodo 1 en €/kw-dia")
     precio_tp2: float = Field(description="Precio del término de potencia en el periodo 2 en €/kw-dia")
+    descuento_promo: float = Field(description="Descuento promocional sobre el término de energía en %")
+    descuento_servicios: float = Field(description="Descuento extra en % por contratar otros servicios")
     tipo_producto: str = Field(description="Tipo de producto, fijo o indexado")
     abonos: float = Field(description="Abonos al cliente en €/años")
     permanencia: str = Field(description="Permanencia del producto")
