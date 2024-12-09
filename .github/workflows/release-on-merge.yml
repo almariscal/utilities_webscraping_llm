@@ -5,6 +5,22 @@ on:
     branches:
       - main
 
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+  actions: write
+  deployments: write
+  discussions: write
+  statuses: write
+  checks: write
+  packages: write
+  pages: write
+  metadata: read
+  security-events: write
+  repository-projects: write
+  workflows: write
+
 jobs:
   build-and-release:
     runs-on: windows-latest
