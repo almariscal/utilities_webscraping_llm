@@ -22,6 +22,19 @@ permissions:
 jobs:
   build-and-release:
     runs-on: windows-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+      actions: write
+      deployments: write
+      discussions: write
+      statuses: write
+      checks: write
+      packages: write
+      pages: write
+      security-events: write
+      repository-projects: write
 
     steps:
       # Paso 1: Clonar el repositorio
