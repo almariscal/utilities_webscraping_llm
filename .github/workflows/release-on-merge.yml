@@ -16,10 +16,8 @@ permissions:
   checks: write
   packages: write
   pages: write
-  metadata: read
   security-events: write
   repository-projects: write
-  workflows: write
 
 jobs:
   build-and-release:
