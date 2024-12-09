@@ -62,7 +62,7 @@ jobs:
           draft: false
           prerelease: false
         env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}  # Token para autenticar la acción
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}  # Token para autenticar la acción
 
       # Paso 7: Subir el ejecutable como un asset de la Release solo si la release fue creada
       - name: Upload to GitHub Release
