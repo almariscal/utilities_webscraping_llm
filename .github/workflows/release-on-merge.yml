@@ -7,7 +7,7 @@ on:
 
 jobs:
   build-and-release:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest  # Usar un runner de Windows
 
     steps:
       # Paso 1: Clonar el repositorio
@@ -18,7 +18,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.9'
+          python-version: '3.10'
 
       # Paso 3: Instalar dependencias del proyecto
       - name: Install dependencies
@@ -32,7 +32,7 @@ jobs:
       - name: Build executable
         run: |
           pyinstaller --onefile main.py
-        # El ejecutable estará en `dist/main.exe`
+        # El ejecutable estará en `dist/main.exe` en Windows
 
       # Paso 5: Crear una Release en GitHub
       - name: Create GitHub Release
@@ -51,6 +51,6 @@ jobs:
         uses: actions/upload-release-asset@v1
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: dist/main.exe  # Ruta del ejecutable generado
+          asset_path: dist\main.exe  # Ruta correcta para Windows
           asset_name: main.exe       # Nombre del asset en la Release
           asset_content_type: application/octet-stream
