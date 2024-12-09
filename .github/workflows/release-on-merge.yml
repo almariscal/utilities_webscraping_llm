@@ -51,7 +51,13 @@ jobs:
         run: |
           if (-Not (Test-Path "dist\main.exe")) { exit 1 }  # Si no existe el archivo, falla el flujo
 
-      # Paso 6: Crear la Release y subir el ejecutable usando softprops/action-gh-release
+      # Paso 6: Crear un tag para la release
+      - name: Create tag
+        run: |
+          git tag v${{ github.run_number }}  # Crear una etiqueta con el número de ejecución del flujo de trabajo
+          git push origin v${{ github.run_number }}  # Subir la etiqueta al repositorio
+
+      # Paso 7: Crear la Release y subir el ejecutable usando softprops/action-gh-release
       - name: Create GitHub Release and Upload Executable
         uses: softprops/action-gh-release@v1
         with:
