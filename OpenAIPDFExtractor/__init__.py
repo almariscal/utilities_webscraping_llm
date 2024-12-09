@@ -1,8 +1,8 @@
 import openai
-from langchain.prompts import ChatPromptTemplate
+#from langchain.prompts import ChatPromptTemplate
 from openai import OpenAI
-from langchain.output_parsers.openai_functions import JsonOutputFunctionsParser
-from langchain.utils.openai_functions import convert_pydantic_to_openai_function
+#from langchain.output_parsers.openai_functions import JsonOutputFunctionsParser
+#from langchain.utils.openai_functions import convert_pydantic_to_openai_function
 from pydantic import BaseModel, Field, ValidationError, Extra
 from typing import List
 import os
