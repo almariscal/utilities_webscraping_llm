@@ -7,7 +7,7 @@ on:
 
 jobs:
   build-and-release:
-    runs-on: windows-latest  # Usar un runner de Windows
+    runs-on: windows-latest
 
     steps:
       # Paso 1: Clonar el repositorio
@@ -18,7 +18,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.10'
+          python-version: '3.9'
 
       # Paso 3: Instalar dependencias del proyecto
       - name: Install dependencies
@@ -32,25 +32,31 @@ jobs:
       - name: Build executable
         run: |
           pyinstaller --onefile main.py
-        # El ejecutable estará en `dist/main.exe` en Windows
+        continue-on-error: true  # Si este paso falla, no se procederá a la creación del release
 
-      # Paso 5: Crear una Release en GitHub
+      # Paso 5: Verificar si el ejecutable fue creado correctamente
+      - name: Check if executable exists
+        run: |
+          if (-Not (Test-Path "dist\main.exe")) { exit 1 }  # Si no existe el archivo, falla el flujo
+
+      # Paso 6: Crear una Release en GitHub solo si el ejecutable existe
       - name: Create GitHub Release
         id: create_release  # ID del paso para acceder a su salida
-        uses: actions/create-release@v1
+        uses: actions/create-release@v2  # Usar la versión más reciente
         with:
           tag_name: v${{ github.run_number }}  # Etiqueta basada en el número de ejecución
           release_name: Release v${{ github.run_number }}
           draft: false
           prerelease: false
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Token para autenticar la acción
 
-      # Paso 6: Subir el ejecutable como un asset de la Release
+      # Paso 7: Subir el ejecutable como un asset de la Release solo si la release fue creada
       - name: Upload to GitHub Release
-        uses: actions/upload-release-asset@v1
+        if: steps.create_release.outcome == 'success'  # Solo subir si la creación de la release fue exitosa
+        uses: actions/upload-release-asset@v1.1  # Usar la versión más reciente
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: dist\main.exe  # Ruta correcta para Windows
+          asset_path: dist\main.exe  # Ruta del ejecutable generado
           asset_name: main.exe       # Nombre del asset en la Release
           asset_content_type: application/octet-stream
