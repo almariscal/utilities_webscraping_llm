@@ -1,26 +1,28 @@
 import openai
-#from langchain.prompts import ChatPromptTemplate
 from openai import OpenAI
-#from langchain.output_parsers.openai_functions import JsonOutputFunctionsParser
-#from langchain.utils.openai_functions import convert_pydantic_to_openai_function
 from pydantic import BaseModel, Field, ValidationError, Extra
-from typing import List
-import os
+from typing import List, Literal
+import logging  # Importar logging para reutilizar el logger global configurado
 import re
 
+# Configurar el logger reutilizando la configuración del main
+logger = logging.getLogger(__name__)
+
 class Precio(BaseModel):
-    """Estructura precio. SOLO RELLENAR LA PARTE DE ELECTRICIDAD"""
+    """Estructura precio"""
     nombre: str = Field(description="Nombre de la empresa que comercializa la oferta")
     nombre_oferta: str = Field(description="Nombre de la oferta")
-    precio_te1: float = Field(description="Precio de la energía en el periodo 1")
-    precio_te2: float = Field(description="Precio de la energía en el periodo 2")
-    precio_te3: float = Field(description="Precio de la energía en el periodo 3")
-    precio_tp1: float = Field(description="Precio del término de potencia en el periodo 1 en €/kw-dia")
-    precio_tp2: float = Field(description="Precio del término de potencia en el periodo 2 en €/kw-dia")
-    descuento_promo: float = Field(description="Descuento promocional sobre el término de energía en %")
-    descuento_servicios: float = Field(description="Descuento extra en % por contratar otros servicios")
+    precio_te1: float = Field(description="Precio de la energía en el periodo 1 (también llamado periodo punta)")
+    precio_te2: float = Field(description="Precio de la energía en el periodo 2 (también llamado periodo llano)")
+    precio_te3: float = Field(description="Precio de la energía en el periodo 3 (también llamado periodo valle)")
+    precio_tp1: float = Field(description="Precio del término de potencia en el periodo 1, también llamado periodo punta")
+    precio_tp2: float = Field(description="Precio del término de potencia en el periodo 2, también llamado periodo valle")
+    #unidades_potencia: Literal["€-kw/dia", "€-kW/mes", "€-kW/año"] = Field(description="Unidades del término de potencia: €-kw/dia, €-kW/mes o €-kW/año.")
+    descuento_promo: float = Field(description="Descuento promocional sobre el término de energía en %, no considerar si el descuento es en € (sería un abono) ni el número de horas gratis")
+    descuento_servicios: float = Field(description="Descuento extra en % por contratar otros servicios.  No confundir con abonos, es un descuento en porcentaje. Puede no haber ningún descuento")
     tipo_producto: str = Field(description="Tipo de producto, fijo o indexado")
-    abonos: float = Field(description="Abonos al cliente en €/años")
+    calendario: str = Field(description="Tipo de calendario que aplica al producto para facturarlo. Puede ser el calendario ATR que determina la legislación o calendarios personalizados (por ejemplo día-noche, horas promo/no promo...)")
+    abonos: float = Field(description="Abonos al cliente en €/años. No incluir sorteos.")
     permanencia: str = Field(description="Permanencia del producto")
     comentario: str = Field(description="Otros comentarios acerca del producto")
     analisis: str = Field(description="Análisis en formato Markdown acerca del producto desde un punto de vista económico pero también de marketing y mercado")
@@ -43,6 +45,7 @@ class PDFParser:
         """Inicializa el cliente OpenAI con la clave proporcionada."""
         openai.api_key = openai_api_key
         self.client = OpenAI()
+        logger.info("PDFParser inicializado con la API de OpenAI")
 
     def parse_pdf(self, pdf_url: str) -> Overview:
         """
@@ -58,8 +61,11 @@ class PDFParser:
             Exception: Si ocurre un error durante el procesamiento o la validación.
         """
         try:
+            logger.info(f"Procesando el archivo PDF: {pdf_url}")
+            
             # Descarga el archivo PDF y súbelo a OpenAI
             file = openai.files.create(file=open(pdf_url, "rb"), purpose='assistants')
+            logger.info(f"Archivo PDF subido a OpenAI con ID: {file.id}")
 
             # Configura el asistente con herramientas y prompts
             tools = [{"type": "file_search"}]
@@ -67,12 +73,12 @@ class PDFParser:
                 name="Price extractor",
                 instructions=(
                     "You are an expert analyzing electricity offers from websites and PDFs, "
-                    "as well as extracting the prices and comparing them. "
-                    #"Generate a structured output according to the Overview schema."
+                    "as well as extracting the prices and comparing them."
                 ),
                 model="gpt-4o-2024-08-06",
                 tools=tools
             )
+            logger.info("Asistente OpenAI configurado correctamente.")
 
             # Crea un thread con el archivo PDF como entrada
             schema_json_string = Overview.model_json_schema()
@@ -82,61 +88,44 @@ class PDFParser:
                         "role": "user",
                         "content": (
                             "Eres un asistente experto en ofertas de electricidad. "
-                            "Puedes generar resúmenes detallados de las ofertas de electricidad "
-                            "siguiendo un esquema JSON."
+                            "Extrae la información en el esquema JSON proporcionado."
                         ),
                     },
                     {
                         "role": "user",
                         "content": (
-                            f"Extrae toda la información y explica la siguiente oferta de electricidad."
-                            f"Genera un output de una manera ordenada para que luego se pueda parsear, así que sigue el esquema que se muestra a continuación: {schema_json_string}. "
-                            #"Incluye únicamente el json y comienza por '{{'."
+                            f"Genera un output siguiendo el esquema: {schema_json_string}."
                         ),
                         "attachments": [{"file_id": file.id, "tools": [{"type": "file_search"}]}],
                     },
                 ]
             )
+            logger.info("Thread creado con el asistente para el análisis del archivo.")
 
             # Ejecuta el proceso de análisis
             run = self.client.beta.threads.runs.create_and_poll(
                 thread_id=thread.id, assistant_id=assistant.id)
+            logger.info("Análisis completado. Recuperando los mensajes.")
+
             messages = list(self.client.beta.threads.messages.list(thread_id=thread.id, run_id=run.id))
             message_content = messages[0].content[0].text
             openai.files.delete(file_id=file.id)
 
-            #Extraemos la info con otra llamada a OpenAI
+            # Extraemos la información en formato JSON
             completion = self.client.beta.chat.completions.parse(
                 model="gpt-4o-2024-08-06",
                 messages=[
-                    {"role": "user", "content": f"Extrae la información en formato json a partir de la extracción del analista de precios {message_content.value}"}
+                    {"role": "user", "content": f"Extrae la información en formato JSON: {message_content.value}"}
                 ],
                 response_format=Overview,
             )
-
-            return completion.choices[0].message.parsed
-
-            # Extrae y valida el JSON
-            #json_string = message_content.value
-            #json_string_limpio = re.sub(r'"\$defs":\s*{.*?}', '', json_string, flags=re.DOTALL)
-            #match = re.search(r'(\{.*\})', json_string_limpio, re.DOTALL)
-            #if match:
-            #    json_str = match.group(1)
-            #    return Overview.parse_raw(json_str)
-            #else:
-            #    raise ValueError("No se encontró un JSON válido en la respuesta.")
+            overview = completion.choices[0].message.parsed
+            logger.info(f"Datos parseados correctamente: {overview.model_dump()}")
+            return overview
 
         except ValidationError as ve:
+            logger.error(f"Error de validación al procesar los datos: {ve}")
             raise Exception(f"Error de validación al procesar los datos: {ve}")
         except Exception as e:
+            logger.error(f"Error inesperado al procesar el PDF: {e}")
             raise Exception(f"Error inesperado al procesar el PDF: {e}")
-
-# Ejemplo de uso en un script principal
-if __name__ == "__main__":
-    try:
-        parser = PDFParser(openai_api_key="TU_API_KEY")
-        pdf_url = './temp_pdf/octopusenergy_es_7076053329209093311_20241208_180609.pdf'
-        overview = parser.parse_pdf(pdf_url)
-        print(overview)
-    except Exception as e:
-        print(f"Error al procesar el PDF: {e}")
