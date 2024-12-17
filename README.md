@@ -131,4 +131,3 @@ Este proyecto está bajo la licencia MIT pero debes solicitar permiso para uso c
 Alberto L. Mariscal
 albertolmariscal@gmail.com  
 © 2024
-
