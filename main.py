@@ -1,72 +1,89 @@
-# MVP to check if it is possible to webscrap using LLMs + OCR
-# The architecture will combine OpenAI + CrewAI in order to obtain an structured output from websites
-
-# Import OpenAI keys from .env file
-from dotenv import load_dotenv
 import os
+import shutil
+import asyncio
+import pandas as pd
+import logging
+from datetime import datetime
+from dotenv import load_dotenv
+from PDFGenerator import PDFGenerator
+from OpenAIPDFExtractor import PDFParser
 
 # Cargar variables del archivo .env
 load_dotenv()
-
-# Acceder a la clave
 openai_api_key = os.getenv("OPENAI_API_KEY")
 
-# Converting the websites to PDF
-from PDFGenerator import PDFGenerator
-import asyncio
-
-# Ruta del archivo con las URLs
+# Configuración de carpetas y archivos
 websites_file = "websites.txt"
-
-# Crear una instancia de PDFGenerator
-pdf_generator = PDFGenerator(websites_file)
-
-# Ejecutar el proceso para generar los PDFs
-asyncio.run(pdf_generator.process_all_websites())
-
-import os
-import shutil
-from OpenAIPDFExtractor import PDFParser
-import pandas as pd
-from datetime import datetime
-
 input_folder = './temp_pdf'
 processed_folder = './processed_pdfs'
 output_folder = './output'
+logs_folder = './logs'
 
 # Crear carpetas necesarias si no existen
 os.makedirs(processed_folder, exist_ok=True)
 os.makedirs(output_folder, exist_ok=True)
+os.makedirs(logs_folder, exist_ok=True)
 
-# Inicializamos el DataFrame vacío
-df = pd.DataFrame()
+# Configuración del logging
+timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+log_file = os.path.join(logs_folder, f'log_proceso_{timestamp}.log')
+logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)s - %(levelname)s - %(message)s',
+                    handlers=[
+                        logging.FileHandler(log_file),
+                        logging.StreamHandler()
+                    ])
+logger = logging.getLogger()
 
-# Procesar cada archivo PDF en la carpeta
+# Paso 1: Generar PDFs desde sitios web
+logger.info("Iniciando generación de PDFs a partir de las URLs")
+try:
+    pdf_generator = PDFGenerator(websites_file)
+    asyncio.run(pdf_generator.process_all_websites())
+    logger.info("Generación de PDFs completada")
+except Exception as e:
+    logger.error(f"Error al generar PDFs: {e}")
+
+# Paso 2: Procesar PDFs y extraer datos
+logger.info("Iniciando procesamiento de PDFs")
 parser = PDFParser(openai_api_key=openai_api_key)
+execution_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+excel_file_path = os.path.join(output_folder, 'resultados_procesados.xlsx')
+
+# Leer el archivo existente si ya existe
+if os.path.exists(excel_file_path):
+    df = pd.read_excel(excel_file_path)
+    logger.info("Archivo Excel existente cargado")
+else:
+    df = pd.DataFrame()
+    logger.info("Nuevo archivo Excel creado")
 
 for filename in os.listdir(input_folder):
     if filename.endswith('.pdf'):
         pdf_path = os.path.join(input_folder, filename)
         try:
-            print(f"Procesando: {filename}")
+            logger.info(f"Procesando archivo: {filename}")
             overview = parser.parse_pdf(pdf_path)
             
-            # Convertir los precios en DataFrame y añadir a `df`
+            # Extraer y transformar los datos, añadiendo la fecha de ejecución
             for precio in overview.precios:
-                df = pd.concat([df, pd.DataFrame([precio.model_dump()])], ignore_index=True)
+                precio_data = precio.model_dump()
+                precio_data['Fecha de Ejecucion'] = execution_date
+                df = pd.concat([df, pd.DataFrame([precio_data])], ignore_index=True)
             
-            # Mover el archivo a la carpeta de procesados
+            # Mover archivo procesado
             shutil.move(pdf_path, os.path.join(processed_folder, filename))
-            print(f"{filename} procesado correctamente y movido a {processed_folder}")
+            logger.info(f"{filename} procesado y movido a {processed_folder}")
         except Exception as e:
-            print(f"Error al procesar {filename}: {e}")
+            logger.error(f"Error al procesar {filename}: {e}")
 
-# Guardar el DataFrame en un archivo Excel
-# Generar una marca de tiempo para el nombre del archivo
-timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-output_excel_path = os.path.join(output_folder, f'resultados_procesados_{timestamp}.xlsx')
+# Guardar el DataFrame en el archivo Excel existente sin borrar datos anteriores
+try:
+    with pd.ExcelWriter(excel_file_path, mode='w', engine='openpyxl') as writer:
+        df.to_excel(writer, index=False)
+    logger.info(f"Datos guardados en el archivo Excel: {excel_file_path}")
+except Exception as e:
+    logger.error(f"Error al guardar el archivo Excel: {e}")
 
-df.to_excel(output_excel_path, index=False)
-print(f"DataFrame guardado en: {output_excel_path}")
-
-input("Presiona Enter para cerrar...")  # Esto mantiene la terminal abierta hasta que el usuario presione Enter.
+logger.info("Proceso completado")
+input("Presiona Enter para cerrar...")
