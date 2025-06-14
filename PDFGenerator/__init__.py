@@ -27,28 +27,58 @@ class PDFGenerator:
         Busca y hace clic en un botón de aceptación de cookies si está presente.
         """
         try:
-            selectors = [
-                "button:has-text('Aceptar')",
-                "button:has-text('Aceptar todo')",
-                "button:has-text('Accept')",
-                "button:has-text('Accept all')"
-            ]
-            for selector in selectors:
-                if await page.query_selector(selector):
-                    await page.click(selector)
-                    print("Cookies aceptadas")
-                    break
+            # Función auxiliar para intentar hacer clic forzadamente
+            async def try_click(button):
+                try:
+                    await button.scroll_into_view_if_needed()
+                    await button.click(timeout=5000, force=True)
+                    return True
+                except Exception as e:
+                    print(f"No se pudo hacer clic: {e}")
+                    return False
+
+            # Buscar en el documento principal
+            buttons = await page.query_selector_all("button")
+            for button in buttons:
+                text = (await button.inner_text()).strip().lower()
+                if "aceptar" in text or "aceptar todo" in text:
+                    if await try_click(button):
+                        print("Cookies aceptadas en documento principal")
+                        return
+
+            # Buscar dentro de iframes
+            for frame in page.frames:
+                if frame == page.main_frame:
+                    continue
+                buttons = await frame.query_selector_all("button")
+                for button in buttons:
+                    text = (await button.inner_text()).strip().lower()
+                    if "aceptar" in text or "aceptar todo" in text:
+                        if await try_click(button):
+                            print("Cookies aceptadas en iframe")
+                            return
+
+            print("No se encontró ningún botón de aceptar cookies")
+
+            print("No se encontró ningún botón de aceptar cookies")
         except Exception as e:
             print(f"No se pudieron aceptar cookies: {e}")
 
+    async def try_click(element):
+        try:
+            await element.scroll_into_view_if_needed()
+            await element.click(timeout=5000, force=True)
+            return True
+        except Exception as e:
+            print(f"No se pudo hacer clic: {e}")
+            return False
+
     async def click_ver_mas_info(self, page):
         """
-        Si la URL es de Iberdrola, busca y hace clic en un botón 'Ver más información' o similar.
+        Si la URL es de Iberdrola o TotalEnergies, busca y hace clic en botones que desplieguen información.
         """
         try:
-            # Verificar si la URL es de Iberdrola
             if "iberdrola.es" in page.url:
-                # Buscar el botón o enlace con texto 'Ver más información' o similar
                 selectors = [
                     "button:has-text('Ver más información')",
                     "a:has-text('Ver más información')",
@@ -57,13 +87,43 @@ class PDFGenerator:
                 ]
                 for selector in selectors:
                     element = await page.query_selector(selector)
-                    if element:
-                        await element.click()
+                    if element and await try_click(element):
                         print(f"Se hizo clic en 'Ver más información' para {page.url}")
-                        await asyncio.sleep(3)  # Esperar a que la información se cargue
+                        await asyncio.sleep(3)
                         break
+
+            elif "totalenergies.es" in page.url:
+                # Hacer scroll hasta abajo para asegurar que todo carga
+                await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                await asyncio.sleep(2)
+
+                # Buscar todos los elementos <summary> con clase item-title (los títulos del acordeón)
+                summary_elements = await page.query_selector_all("summary")
+
+                if not summary_elements:
+                    print("No se encontraron elementos <summary> con clase 'item-title'.")
+                    # Para debug, listamos todos los summaries
+                    all_summaries = await page.query_selector_all("summary")
+                    for idx, elem in enumerate(all_summaries):
+                        text = await elem.inner_text()
+                        classes = await elem.get_attribute("class")
+                        print(f"Summary {idx+1}: texto='{text.strip()}', clases='{classes}'")
+                    return
+
+                print(f"Encontrados {len(summary_elements)} acordeones (summary.item-title)")
+
+                # Hacer clic en cada summary para abrir acordeón
+                for idx, summary in enumerate(summary_elements):
+                    try:
+                        await summary.scroll_into_view_if_needed()
+                        await summary.click(force=True)
+                        print(f"Acordeón {idx+1} abierto: {await summary.inner_text()}")
+                        await asyncio.sleep(0.5)
+                    except Exception as e:
+                        print(f"Error al abrir acordeón {idx+1}: {e}")
+
         except Exception as e:
-            print(f"No se pudo hacer clic en 'Ver más información': {e}")
+            print(f"No se pudo hacer clic en sección de información: {e}")
 
     async def generate_pdf(self, url, browser):
         """
