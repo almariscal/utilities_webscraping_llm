@@ -39,12 +39,20 @@ class PDFGenerator:
 
             # Buscar en el documento principal
             buttons = await page.query_selector_all("button")
-            for button in buttons:
-                text = (await button.inner_text()).strip().lower()
-                if "aceptar" in text or "aceptar todo" in text:
-                    if await try_click(button):
-                        print("Cookies aceptadas en documento principal")
-                        return
+            if "octopus" in page.url:
+                for button in buttons:
+                    text = (await button.inner_text()).strip().lower()
+                    if "rechazar" in text:
+                        if await try_click(button):
+                            print("Cookies rechazadas en documento principal")
+                            return
+            else:
+                for button in buttons:
+                    text = (await button.inner_text()).strip().lower()
+                    if "aceptar" in text or "aceptar todo" in text:
+                        if await try_click(button):
+                            print("Cookies aceptadas en documento principal")
+                            return
 
             # Buscar dentro de iframes
             for frame in page.frames:
@@ -64,7 +72,7 @@ class PDFGenerator:
         except Exception as e:
             print(f"No se pudieron aceptar cookies: {e}")
 
-    async def try_click(element):
+    async def try_click(self, element):
         try:
             await element.scroll_into_view_if_needed()
             await element.click(timeout=5000, force=True)
@@ -80,14 +88,14 @@ class PDFGenerator:
         try:
             if "iberdrola.es" in page.url:
                 selectors = [
-                    "button:has-text('Ver más información')",
-                    "a:has-text('Ver más información')",
+                    "#ver-detalle",  # Selector por ID del botón
+                    "span:has-text('Ver más información')",
                     "button:has-text('Más información')",
                     "a:has-text('Más información')"
                 ]
                 for selector in selectors:
                     element = await page.query_selector(selector)
-                    if element and await try_click(element):
+                    if element and await self.try_click(element):
                         print(f"Se hizo clic en 'Ver más información' para {page.url}")
                         await asyncio.sleep(3)
                         break
