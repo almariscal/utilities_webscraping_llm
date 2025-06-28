@@ -11,22 +11,22 @@ logger = logging.getLogger(__name__)
 # === MODELOS ===
 
 class Precio(BaseModel):
-    nombre: str
-    nombre_oferta: str
-    precio_te1: float  # €/MWh
-    precio_te2: float
-    precio_te3: float
-    precio_tp1: float  # €/kW-año (después de normalización)
-    precio_tp2: float
+    nombre: str = Field(description="Nombre de la empresa que comercializa la oferta")
+    nombre_oferta: str = Field(description="Nombre de la oferta")
+    precio_te1: float = Field(description="Precio de la energía en el periodo 1 (también llamado periodo punta)")
+    precio_te2: float = Field(description="Precio de la energía en el periodo 2 (también llamado periodo llano)")
+    precio_te3: float = Field(description="Precio de la energía en el periodo 3 (también llamado periodo valle)")
+    precio_tp1: float = Field(description="Precio del término de potencia en el periodo 1, también llamado periodo punta")
+    precio_tp2: float = Field(description="Precio del término de potencia en el periodo 2, también llamado periodo valle")
     unidades_potencia: Literal["€/kW/día", "€/kW/mes", "€/kW/año"] = "€/kW/año"
-    descuento_promo: float
-    descuento_servicios: float
-    tipo_producto: str
-    calendario: str
-    abonos: float
-    permanencia: str
-    comentario: str
-    analisis: str
+    descuento_promo: float = Field(description="Descuento promocional sobre el término de energía en %. No incluir descuentos en euros € (sería un abono) ni el número de horas gratis")
+    descuento_servicios: float = Field(description="Descuento extra en % por contratar otros servicios.  No confundir con abonos, es un descuento en porcentaje. Puede no haber ningún descuento")
+    tipo_producto: str = Field(description="Tipo de producto, fijo o indexado")
+    calendario: str = Field(description="Tipo de calendario que aplica al producto para facturarlo. Puede ser el calendario ATR que determina la legislación o calendarios personalizados (por ejemplo día-noche, horas promo/no promo...)")
+    abonos: float = Field(description="Abonos al cliente en €/años. Añadir descuentos en euros €. No incluir sorteos.")
+    permanencia: str = Field(description="Permanencia del producto")
+    comentario: str = Field(description="Otros comentarios acerca del producto")
+    analisis: str = Field(description="Análisis en formato Markdown acerca del producto desde un punto de vista económico pero también de marketing y mercado")
 
     class Config:
         extra = Extra.ignore
@@ -149,7 +149,7 @@ class PDFParser:
 
             # Parsear output
             completion = self.client.beta.chat.completions.parse(
-                model="gpt-4o-2024-08-06",
+                model="gpt-4.1-nano-2025-04-14",
                 messages=[
                     {"role": "user", "content": f"Extrae el JSON: {message_content.value}"}
                 ],
