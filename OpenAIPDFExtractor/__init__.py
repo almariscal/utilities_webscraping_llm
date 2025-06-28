@@ -32,24 +32,50 @@ class Precio(BaseModel):
         extra = Extra.ignore
 
     def normalizar(self):
-        """Convierte precios a €/MWh y €/kW-año"""
-        # Normalizar energía a €/MWh si viene en €/kWh
-        if self.precio_te1 < 1:
-            self.precio_te1 *= 1000
-        if self.precio_te2 < 1:
-            self.precio_te2 *= 1000
-        if self.precio_te3 < 1:
-            self.precio_te3 *= 1000
+        """Normaliza unidades y corrige incoherencias comunes"""
 
-        # Normalizar potencia a €/kW-año
+        # --- Preprocesamiento de potencia: detectar uso erróneo de "." como separador de miles ---
+        for attr in ['precio_tp1', 'precio_tp2']:
+            valor = getattr(self, attr)
+            if valor > 10000:
+                valor /= 1000  # probablemente se interpretó mal un punto decimal como miles
+            setattr(self, attr, valor)
+
+        # --- Normalizar energía a €/MWh si viene en €/kWh ---
+        for attr in ['precio_te1', 'precio_te2', 'precio_te3']:
+            valor = getattr(self, attr)
+            if valor < 1:
+                valor *= 1000
+            elif valor > 10000:
+                valor /= 1000
+            setattr(self, attr, valor)
+
+        # Ordenar precios te1 >= te2 >= te3
+        precios_te = sorted([self.precio_te1, self.precio_te2, self.precio_te3], reverse=True)
+        self.precio_te1, self.precio_te2, self.precio_te3 = precios_te
+
+        # Si te2 y te3 son 0, asumir tarifa única y copiarlos de te1
+        if self.precio_te2 == 0 and self.precio_te3 == 0:
+            self.precio_te2 = self.precio_te3 = self.precio_te1
+
+        # --- Normalizar potencia a €/kW-año ---
         if self.unidades_potencia == "€/kW/día":
             self.precio_tp1 *= 365
             self.precio_tp2 *= 365
         elif self.unidades_potencia == "€/kW/mes":
             self.precio_tp1 *= 12
             self.precio_tp2 *= 12
-
         self.unidades_potencia = "€/kW/año"
+
+        # --- Procesar descuentos: mover € a abonos, dejar % en descuento_promo/servicios ---
+        if self.descuento_promo > 1:  # probablemente en euros
+            self.abonos += self.descuento_promo
+            self.descuento_promo = 0.0
+
+        if self.descuento_servicios > 1:  # probablemente en euros
+            self.abonos += self.descuento_servicios
+            self.descuento_servicios = 0.0
+
 
 class Overview(BaseModel):
     precios: List[Precio]
@@ -84,7 +110,11 @@ class PDFParser:
                 instructions=(
                     "Eres un experto en analizar ofertas de electricidad. "
                     "Extrae los precios y conviértelos a €/MWh y €/kW-año. "
-                    "Ignora ofertas de gas y no inventes datos que no estén explícitamente presentes."
+                    "Ignora ofertas de gas y no inventes datos que no estén explícitamente presentes. "
+                    "Los descuentos pueden estar en porcentaje (%) o en euros (€). "
+                    "Si un descuento es en euros, debe ir en el campo 'abonos'. "
+                    "Si los precios de energía tienen solo uno definido y los otros son 0, replica el mismo en todos. "
+                    "Asegúrate de que precio_te1 >= precio_te2 >= precio_te3."
                 ),
                 model="gpt-4o",
                 tools=tools
